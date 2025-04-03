@@ -1,0 +1,10 @@
+# Ignore Python bytecode
+*.pyc
+*.pyo
+
+# Ignore Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Ignore virtual environments
+venv/
+thesis-env/
