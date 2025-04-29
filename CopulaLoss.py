@@ -28,7 +28,7 @@ class CopulaLikelihood(loss.Loss):
 
         :return: np.ndarray with (transformed) parameter initial guess
         """
-        return np.hstack((np.log(1/np.mean(y, axis = 0))*np.ones_like(y), self.fgm_par_link(np.zeros((y.shape[0], 1)))))
+        return np.hstack((1/np.mean(y, axis = 0)*np.ones_like(y), np.zeros((y.shape[0], 1))))
 
     def exp_lpdf_grad(self, y, par):
         """
