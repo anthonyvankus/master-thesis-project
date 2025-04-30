@@ -28,7 +28,7 @@ class CopulaLikelihood(loss.Loss):
 
         :return: np.ndarray with (transformed) parameter initial guess
         """
-        return np.hstack((1/np.mean(y, axis = 0)*np.ones_like(y), np.zeros((y.shape[0], 1))))
+        return np.hstack((np.log(1/np.mean(y, axis = 0)*np.ones_like(y)), self.fgm_par_link(np.zeros((y.shape[0], 1)))))
 
     def exp_lpdf_grad(self, y, par):
         """
@@ -54,7 +54,9 @@ class CopulaLikelihood(loss.Loss):
 
         :return: log pdf of a bivariate FGM copula dist
         """
-        return np.sum(np.log(1 + par*(1-2*u[:,0])*(1-2*u[:,1])))
+        u0 = u[:,0].reshape(-1,1)
+        u1 = u[:,1].reshape(-1,1)
+        return np.sum(np.log(1 + par*(1-2*u0)*(1-2*u1)))
     
     def fgm_copula_lpdf_grad(self, u, par):
         """
@@ -63,7 +65,9 @@ class CopulaLikelihood(loss.Loss):
 
         :return: first derivative of log pdf of a bivariate FGM copula dist w.r.t its parameter
         """
-        prod = (1-2*u[:, 0].reshape(-1, 1))*(1-2*u[:, 1].reshape(-1, 1)) # (n_obs, 1)
+        u0 = u[:,0].reshape(-1,1)
+        u1 = u[:,1].reshape(-1,1)
+        prod = (1-2*u0)*(1-2*u1) # (n_obs, 1)
         return prod/(1 + par*prod) # (n_obs, 1)
 
     def fgm_copula_lpdf_hess(self, u, par):
@@ -105,7 +109,7 @@ class CopulaLikelihood(loss.Loss):
 
         :return: second derivative of inverse link function w.r.t. transformed FGM copula parameter
         """
-        return (-2*tpar)*np.square(self.fgm_par_inv_link_grad(tpar))
+        return ((-4*tpar)/(np.pi*(np.square(tpar)+1)**2))
 
     def get_grad_and_hessian_diags(self, y, y_hat, iteration, leaves_idx):
         """
@@ -118,6 +122,8 @@ class CopulaLikelihood(loss.Loss):
 
         note: for now we assume Exponential marginals and a bivariate FGM copula with one parameter
         """
+        #print("tpar estimates:")
+        #print(y_hat)
         # define and reshape observation and parameter matrices
         y0 = y[:, 0].reshape(-1,1)
         y1 = y[:, 1].reshape(-1,1)
@@ -133,10 +139,10 @@ class CopulaLikelihood(loss.Loss):
         u1 = stats.expon.cdf(y0, loc = 0, scale = 1/np.exp(lambda0))
         u2 = stats.expon.cdf(y1, loc = 0, scale = 1/np.exp(lambda1))
         u = np.hstack((u1, u2))
-
+        
         # get gradient for copula parameter
         cop_grad = self.fgm_copula_lpdf_grad(u, self.fgm_par_inv_link(rho))*self.fgm_par_inv_link_grad(rho)
-
+        
         # combine grad components into a vector
         grad = np.hstack((m0_grad, m1_grad, cop_grad))
 
@@ -181,7 +187,7 @@ class CopulaLikelihood(loss.Loss):
         """
         H_inv = self.H_inv(H)
         optimal_loss = - np.sum(H_inv @ G2)
-        optimal_loss += self.H_inv_last_row_effect(G2, H) # adjusting for the effects of the last row
+        #optimal_loss += self.H_inv_last_row_effect(G2, H) # adjusting for the effects of the last row
         return optimal_loss
     
     def eval_optimal_response(self, G, H):
@@ -195,7 +201,7 @@ class CopulaLikelihood(loss.Loss):
         """
         H_inv = self.H_inv(H)
         optimal_response = H_inv @ G
-        optimal_response[-1] += self.H_inv_last_row_effect(G, H) # adjusting for the effects of the last row
+        #optimal_response[-1] += self.H_inv_last_row_effect(G, H) # adjusting for the effects of the last row
         return optimal_response
 
     def tree_loss(self, y, y_hat):
@@ -210,5 +216,5 @@ class CopulaLikelihood(loss.Loss):
         u1 = stats.expon.cdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))
         u2 = stats.expon.cdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))
         u = np.hstack((u1, u2))
-        return -(self.fgm_copula_lpdf(u, self.fgm_par_inv_link(y_hat[:2].reshape(-1, 1))) + np.sum(stats.expon.logpdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))) + np.sum(stats.expon.logpdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))))
+        return -(self.fgm_copula_lpdf(u, self.fgm_par_inv_link(y_hat[:, -1].reshape(-1, 1))) + np.sum(stats.expon.logpdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))) + np.sum(stats.expon.logpdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))))
 
