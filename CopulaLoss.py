@@ -122,8 +122,6 @@ class CopulaLikelihood(loss.Loss):
 
         note: for now we assume Exponential marginals and a bivariate FGM copula with one parameter
         """
-        #print("tpar estimates:")
-        #print(y_hat)
         # define and reshape observation and parameter matrices
         y0 = y[:, 0].reshape(-1,1)
         y1 = y[:, 1].reshape(-1,1)
@@ -160,13 +158,13 @@ class CopulaLikelihood(loss.Loss):
         """
         Evaluate the effect of the last row from the IFM-approximated inverse Hessian
 
-        :param G: mean gradient for the current leaf. (n_t)
+        :param G: mean gradient for the current leaf. (n_t) square of mean gradient can also be passed.
         :param H: mean Hessian for the current leaf. (n_t)
 
-        :return: correction term for optimal response of copula dependence parameter
+        :return: correction term for optimal response of copula dependence parameter (scalar)
         """
-        const = G[-1]/(H[-1] + self.lambda_weights) # scalar
-        return const * np.square(G[:-1]) @ (1/(H[:-1] + self.lambda_weights))
+        const = G[-1]/(H[-1] + self.lambda_weights)
+        return const * G[:-1] @ (1/(H[:-1] + self.lambda_weights))
     
     def H_inv(self, H):
         """
@@ -187,7 +185,7 @@ class CopulaLikelihood(loss.Loss):
         """
         H_inv = self.H_inv(H)
         optimal_loss = - np.sum(H_inv @ G2)
-        #optimal_loss += self.H_inv_last_row_effect(G2, H) # adjusting for the effects of the last row
+        optimal_loss += - self.H_inv_last_row_effect(G2, H) # adjusting for the effects of the last row
         return optimal_loss
     
     def eval_optimal_response(self, G, H):
@@ -201,7 +199,7 @@ class CopulaLikelihood(loss.Loss):
         """
         H_inv = self.H_inv(H)
         optimal_response = H_inv @ G
-        #optimal_response[-1] += self.H_inv_last_row_effect(G, H) # adjusting for the effects of the last row
+        optimal_response[-1] += self.H_inv_last_row_effect(G, H) # adjusting for the effects of the last row
         return optimal_response
 
     def tree_loss(self, y, y_hat):
