@@ -17,6 +17,12 @@ class CopulaLikelihood(loss.Loss):
     def __init__(self, lambda_weights: float = 0.1, lambda_leaves: float = 0.1, **loss_kwargs):
         super().__init__(lambda_weights, lambda_leaves, **loss_kwargs)
     
+    def rank_pseudo_obs(self, y):
+        n_obs = y.shape[0]
+        u1 = stats.rankdata(y[:, 0])/(n_obs + 1)
+        u2 = stats.rankdata(y[:, 1])/(n_obs + 1)
+        return np.hstack((u1.reshape(-1,1), u2.reshape(-1,1)))
+
     def set_dimension(self, n_dims):
         self.n_dims = 3 #note: for our simple bicopula example with exponential marginals we will hardcode the number of dimensions = number of parameters = 3
 
@@ -133,11 +139,14 @@ class CopulaLikelihood(loss.Loss):
         m0_grad = self.exp_lpdf_grad(y0, np.exp(lambda0))*np.exp(lambda0) # log link is used for exponential parameters
         m1_grad = self.exp_lpdf_grad(y1, np.exp(lambda1))*np.exp(lambda1)
 
-        # compute pseudo-observations for FGM copula given estimated marginal dist parameters (subject to change: e.g. rank-based pseudo-observations could be used instead)
-        u1 = stats.expon.cdf(y0, loc = 0, scale = 1/np.exp(lambda0))
-        u2 = stats.expon.cdf(y1, loc = 0, scale = 1/np.exp(lambda1))
-        u = np.hstack((u1, u2))
-        
+        # compute pseudo-observations for FGM copula given marginal CDF from estimated dist. parameters (subject to change: e.g. rank-based pseudo-observations could be used instead)
+        #u1 = stats.expon.cdf(y0, loc = 0, scale = 1/np.exp(lambda0))
+        #u2 = stats.expon.cdf(y1, loc = 0, scale = 1/np.exp(lambda1))
+        #u = np.hstack((u1, u2))
+
+        #Rank-based method of computing pseudo-observations
+        u = self.rank_pseudo_obs(y)
+
         # get gradient for copula parameter
         cop_grad = self.fgm_copula_lpdf_grad(u, self.fgm_par_inv_link(rho))*self.fgm_par_inv_link_grad(rho)
         
@@ -211,8 +220,10 @@ class CopulaLikelihood(loss.Loss):
 
         :return: tree loss
         """
-        u1 = stats.expon.cdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))
-        u2 = stats.expon.cdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))
-        u = np.hstack((u1, u2))
+        #u1 = stats.expon.cdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))
+        #u2 = stats.expon.cdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))
+        #u = np.hstack((u1, u2))
+
+        u = self.rank_pseudo_obs(y)
         return -(self.fgm_copula_lpdf(u, self.fgm_par_inv_link(y_hat[:, -1].reshape(-1, 1))) + np.sum(stats.expon.logpdf(y[:, 0].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 0].reshape(-1, 1)))) + np.sum(stats.expon.logpdf(y[:, 1].reshape(-1, 1), loc = 0, scale = 1/np.exp(y_hat[:, 1].reshape(-1, 1)))))
 
