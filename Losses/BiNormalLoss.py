@@ -132,10 +132,16 @@ class BiNormalLikelihood(loss.Loss):
         d = a**2 + b**2
         return ((1+rho**2) + 2*c*rho - d)/((1-rho**2)**2) + (4*rho*(c*(1+rho**2) - d*rho))/((1-rho**2)**3)
     
-    def gaussian_lpdf_mixed_hess(y, u, mu, sigma):
+    def gaussian_lpdf_mixed_hess(self, y, u, rho):
         a = stats.norm.ppf(u[:, 0]).reshape(-1,1)
         b = stats.norm.ppf(u[:, 1]).reshape(-1,1)
-        pass
+        return ((1+rho**2)*b - 2*a*rho)/((1-rho**2)**2)
+    
+    def gaussian_lpdf_mixed_mu_hess(self, y, u, sigma, rho):
+        return -self.gaussian_lpdf_mixed_hess(y, u, rho)/sigma
+    
+    def gaussian_lpdf_mixed_sigma_hess(self, y, u, mu, sigma, rho):
+        return self.gaussian_lpdf_mixed_mu_hess(y, u, sigma, rho)*(y - mu)
     
     def cop_par_link(self, par):
         """
@@ -245,6 +251,11 @@ class BiNormalLikelihood(loss.Loss):
 
         # get copula parameter hess
         cop_hess = -(self.gaussian_lpdf_hess(u, rho)*(self.cop_par_inv_link_grad(self.cop_par_link(rho)))**2 + self.gaussian_lpdf_grad(u, rho)*self.cop_par_inv_link_hess(self.cop_par_link(rho)))
+
+        cop_mu0_hess = -self.norm_lpdf_mixed_mu_hess(y0, u, sigma0, rho) # ADD link derivative
+        cop_sigma0_hess = -self.norm_lpdf_mixed_sigma_hess(y0, u, mu0, sigma0, rho) # ADD link derivative
+
+        #reverse columns of u and compute rest of mixed hess
 
         #combine hess component into a vector
         #hess_diags = np.hstack((mu0_hess, sigma0_hess, mu1_hess, sigma1_hess, cop_hess, mixed0_hess, mixed1_hess, grad))
