@@ -33,15 +33,20 @@ class PricingLikelihood(loss.Loss):
         :return: np.ndarray with (transformed) parameter initial guess i.e. (r, logodds, natshape1, natrate1, natshape2, natrate2, rho)
         """
         expo = y[:, -1].reshape(-1,1)
-        r_hat0 = np.log(np.mean(y[:,0]/expo, axis = 0))*np.ones((y.shape[0], 1))
-        p0 = np.sum(y[:,1])/np.sum(y[:,0])
-        logodds_hat0 = special.logit(p0)*np.ones((y.shape[0], 1))
-        rate1_hat0 = 1/(np.mean(y[:,2]*np.log(y[:,2])) - np.mean(y[:,2])*np.mean(np.log(y[:,2])))
-        shape1_hat0 = np.mean(y[:,2])*rate1_hat0 
-        rate2_hat0 = 1/(np.mean(y[:,3]*np.log(y[:,3])) - np.mean(y[:,3])*np.mean(np.log(y[:,3])))
-        shape2_hat0 = np.mean(y[:,3])*rate2_hat0
-
-        return np.hstack((r_hat0, logodds_hat0, np.log(shape1_hat0)*np.ones((y.shape[0], 1)), np.log(rate1_hat0)*np.ones((y.shape[0], 1)), np.log(shape2_hat0)*np.ones((y.shape[0], 1)) , np.log(rate2_hat0)*np.ones((y.shape[0], 1)), np.zeros((y.shape[0], 1))))
+        n = y[:, 0].reshape(-1,1)
+        t = y[:, 1].reshape(-1,1)
+        y1 = y[:, 2].reshape(-1,1)
+        y2 = y[:, 3].reshape(-1,1)
+        r_hat0 = np.log(np.sum(n, axis = 0)/np.sum(expo, axis = 0))
+        p0 = np.sum(t)/np.sum(n)
+        logodds_hat0 = special.logit(p0)
+        shape_fit1, _, scale_fit1 = stats.gamma.fit(y1[np.nonzero(y1)], floc=0)
+        shape_fit2, _, scale_fit2 = stats.gamma.fit(y2[np.nonzero(y2)], floc=0)
+        nat_shape1_hat0 = np.log(shape_fit1 + 1)
+        nat_rate1_hat0 = np.log(1/scale_fit1)
+        nat_shape2_hat0 = np.log(shape_fit2 + 1)
+        nat_rate2_hat0 = np.log(1/scale_fit2)
+        return np.hstack((r_hat0*np.ones((y.shape[0], 1)), logodds_hat0*np.ones((y.shape[0], 1)), nat_shape1_hat0*np.ones((y.shape[0], 1)), nat_rate1_hat0*np.ones((y.shape[0], 1)), nat_shape2_hat0*np.ones((y.shape[0], 1)) , nat_rate2_hat0*np.ones((y.shape[0], 1)), np.zeros((y.shape[0], 1))))
     
     def rank_pseudo_obs(self, y):
         """
@@ -72,7 +77,7 @@ class PricingLikelihood(loss.Loss):
         return np.where(y != 0, np.log(y) - special.psi(eta1+1) + np.log(eta2), 0)
 
     def gamma_lpdf_grad_eta2(self, y, eta1, eta2):
-        return np.where(y != 0, -y - (eta1+1)/eta2, 0)
+        return np.where(y != 0, -y + (eta1+1)/eta2, 0)
     
     def gamma_lpdf_hess_eta1(self, eta1):
         return -special.polygamma(1, eta1+1)
@@ -85,7 +90,7 @@ class PricingLikelihood(loss.Loss):
         b = stats.norm.ppf(u[:, 1]).reshape(-1,1)
         c = a*b
         d = a**2 + b**2
-        return np.sum(np.where(a == -np.inf or b == -np.inf, 0, -np.log(np.sqrt(1-rho**2)) - ((rho**2)*d - 2*rho*c)/(2*(1-rho**2))))
+        return np.sum(-np.log(np.sqrt(1-rho**2)) - ((rho**2)*d - 2*rho*c)/(2*(1-rho**2))) #np.sum(np.where(a == -np.inf or b == -np.inf, 0, -np.log(np.sqrt(1-rho**2)) - ((rho**2)*d - 2*rho*c)/(2*(1-rho**2))))
 
     def gaussian_lpdf_grad(self, u, rho):
         """
@@ -100,7 +105,7 @@ class PricingLikelihood(loss.Loss):
         b = stats.norm.ppf(u[:, 1]).reshape(-1,1)
         c = a*b
         d = a**2 + b**2
-        return np.where(a == -np.inf or b == -np.inf, 0, (rho/(1-rho**2) + ((1+rho**2)*c - d*rho)/((1-rho**2)**2)))
+        return (rho/(1-rho**2) + ((1+rho**2)*c - d*rho)/((1-rho**2)**2)) #np.where(a == -np.inf or b == -np.inf, 0, (rho/(1-rho**2) + ((1+rho**2)*c - d*rho)/((1-rho**2)**2)))
     
     def gaussian_lpdf_hess(self, u, rho):
         """
@@ -115,7 +120,7 @@ class PricingLikelihood(loss.Loss):
         b = stats.norm.ppf(u[:, 1]).reshape(-1,1)
         c = a*b
         d = a**2 + b**2
-        return np.where(a == -np.inf or b == -np.inf, 1, ((1+rho**2) + 2*c*rho - d)/((1-rho**2)**2) + (4*rho*(c*(1+rho**2) - d*rho))/((1-rho**2)**3))
+        return ((1+rho**2) + 2*c*rho - d)/((1-rho**2)**2) + (4*rho*(c*(1+rho**2) - d*rho))/((1-rho**2)**3) #np.where(a == -np.inf or b == -np.inf, 1, ((1+rho**2) + 2*c*rho - d)/((1-rho**2)**2) + (4*rho*(c*(1+rho**2) - d*rho))/((1-rho**2)**3))
     
     def cop_par_link(self, par):
         """
@@ -158,6 +163,7 @@ class PricingLikelihood(loss.Loss):
 
         :return: grad, hessian_diags tuple, each of which is a (n_obs, n_t) matrix
         """
+        n_obs = y.shape[0]
         # define and reshape observation and parameter matrices
         n = y[:, 0].reshape(-1,1)
         t = y[:, 1].reshape(-1,1)
@@ -198,10 +204,13 @@ class PricingLikelihood(loss.Loss):
             u = np.hstack((u1, u2))
 
             # get copula parameter gradient
-            cop_grad = -self.gaussian_lpdf_grad(u, rho)*self.cop_par_inv_link_grad(self.cop_par_link(rho))
+            cop_grad = np.zeros((n_obs, 1))
+            mask = ~np.any(u == 0, axis = 1)
+            cop_grad[mask] = -self.gaussian_lpdf_grad(u[mask], rho[mask])*self.cop_par_inv_link_grad(self.cop_par_link(rho[mask]))
 
             # get copula parameter hessian
-            cop_hess = -(self.gaussian_lpdf_hess(u, rho)*(self.cop_par_inv_link_grad(self.cop_par_link(rho)))**2 + self.gaussian_lpdf_grad(u, rho)*self.cop_par_inv_link_hess(self.cop_par_link(rho)))
+            cop_hess = np.ones((n_obs, 1))
+            cop_hess[mask] = -(self.gaussian_lpdf_hess(u[mask], rho[mask])*(self.cop_par_inv_link_grad(self.cop_par_link(rho[mask])))**2 + self.gaussian_lpdf_grad(u[mask], rho[mask])*self.cop_par_inv_link_hess(self.cop_par_link(rho[mask])))
         else:
             # no parameter inference done before warm-up phase ends
             cop_grad = np.zeros((y.shape[0], 1))
@@ -272,12 +281,17 @@ class PricingLikelihood(loss.Loss):
         natshape2 = (np.exp(y_hat[:, 4])-1).reshape(-1,1)
         natrate2 = np.exp(y_hat[:, 5]).reshape(-1,1)
         rho = self.cop_par_inv_link(y_hat[:, -1]).reshape(-1,1)
-        u = np.where(y0 != 0 and y1!= 0, self.rank_pseudo_obs(np.hstack((y0, y1))), np.zeros((0,0)))
+        #u = np.where(y0 != 0 and y1!= 0, self.rank_pseudo_obs(np.hstack((y0, y1))), np.zeros((0,0)))
+        # compute cdf-based pseudo-observations
+        u1 = stats.gamma.cdf(y0, a = natshape1 + 1, scale = 1/natrate1) 
+        u2 = stats.gamma.cdf(y1, a = natshape2 + 1, scale = 1/natrate2)
+        u = np.hstack((u1, u2))
+        mask = ~np.any(u == 0, axis = 1)
         
         l0 = np.sum(stats.poisson.logpmf(k = n, mu = expo*np.exp(r)))
         l1 = np.sum(np.where(n != 0, stats.binom.logpmf(k = t, n = n, p = special.expit(logodds)), 0))
-        l2 = np.sum(np.where(y0 != 0, stats.gamma.logpdf(x = y0, shape = (natshape1 + 1), scale = 1/natrate1), 0))
-        l3 = np.sum(np.where(y1 != 0, stats.gamma.logpdf(x = y1, shape = (natshape2 + 1), scale = 1/natrate2), 0))
-        lc = self.gaussian_lpdf(u, rho)
-
+        l2 = np.sum(np.where(y0 != 0, stats.gamma.logpdf(x = y0, a = (natshape1 + 1), scale = 1/natrate1), 0))
+        l3 = np.sum(np.where(y1 != 0, stats.gamma.logpdf(x = y1, a = (natshape2 + 1), scale = 1/natrate2), 0))
+        lc = self.gaussian_lpdf(u[mask], rho[mask])
+        
         return -(l0 + l1 + l2 + l3 + lc)
