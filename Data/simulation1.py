@@ -7,6 +7,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import numpy as np
+from sklearn.linear_model import GammaRegressor
 import mbtr.utils as ut
 from scipy.linalg import hankel
 from scipy.stats import expon
@@ -175,12 +176,6 @@ def clip_copula_samples(samples, eps=1e-10):
 def mse(y, y_pred):
     return np.mean((y-y_pred)**2)
 
-def sum_of_squares(y, y_pred):
-    return np.sum((y-y_pred)**2)
-
-def r_squared(y, y_pred, y_bar):
-    return (1 - sum_of_squares(y, y_pred)/sum_of_squares(y, y_bar))
-
 @contextmanager
 def suppress_stdout_stderr():
     with open(os.devnull, 'w') as fnull:
@@ -193,8 +188,11 @@ def suppress_stdout_stderr():
 
 # Step-wise function
 n_sim = 500
-
-benchmark_marginal_results = {"clayton_sample": {"mse": [], "-logL": []}, "gumbel_sample": {"mse": [], "-logL": []}, "gaussian_sample": {"mse": [], "-logL": []}}
+benchmark_marginal_results = {
+    "mle": {"clayton_sample": {"mse": [], "-logL": []}, "gumbel_sample": {"mse": [], "-logL": []}, "gaussian_sample": {"mse": [], "-logL": []}},
+    "glm": {"clayton_sample": {"mse": [], "-logL": []}, "gumbel_sample": {"mse": [], "-logL": []}, "gaussian_sample": {"mse": [], "-logL": []}}
+}
+#benchmark_marginal_results = {"clayton_sample": {"mse": [], "-logL": []}, "gumbel_sample": {"mse": [], "-logL": []}, "gaussian_sample": {"mse": [], "-logL": []}}
 benchmark_copula_results = {"true": {"clayton": {"mse": [], "-logL": []}, "gumbel": {"mse": [], "-logL": []}, "gaussian": {"mse": [], "-logL": []}}, "pseudo": {"clayton": {"mse": [], "-logL": []}, "gumbel": {"mse": [], "-logL": []}, "gaussian": {"mse": [], "-logL": []}}}
 model_marginal_results = {"clayton": {"mse": [], "-logL": []}, "gumbel": {"mse": [], "-logL": []}, "gaussian": {"mse": [], "-logL": []}}
 model_copula_results = {"true": {"clayton": {"mse": [], "-logL": []}, "gumbel": {"mse": [], "-logL": []}, "gaussian": {"mse": [], "-logL": []}}, "pseudo": {"clayton": {"mse": [], "-logL": []}, "gumbel": {"mse": [], "-logL": []}, "gaussian": {"mse": [], "-logL": []}}}
@@ -223,18 +221,46 @@ for i in range(n_sim):
     gaussian_sample = clip_copula_samples(sample_gaussian_copula(gaussian_tau2par(tau)))
     gumbel_sample = clip_copula_samples(sample_gumbel_copula(gumbel_tau2par(tau)))
 
-    rate1 = np.exp(-1+3*x1 - 0.5*x3)
-    rate2 = np.exp(-1-0.1*x1 + 2.5*x3)
+    rate1 = np.exp(-1+3*x1 - 0.5*x3 + x1*(x3 > 0.6))
+    rate2 = np.exp(-1-0.1*x1 + 2.5*x3 - x3*(x1 < 0.4))
     rate = np.stack((rate1, rate2), axis = 1)
 
     y_clayton = copula_to_exponential(clayton_sample, rate1, rate2)
     y_gumbel = copula_to_exponential(gumbel_sample, rate1, rate2)
     y_gauss = copula_to_exponential(gaussian_sample, rate1, rate2)
 
+    # GLM marginal model
+    glm_clayton = GammaRegressor(alpha=0.0, max_iter = 500)
+    glm_gumbel = GammaRegressor(alpha=0.0, max_iter = 500)
+    glm_gaussian = GammaRegressor(alpha=0.0, max_iter = 500)
+    
+    interaction_effect = (x1*x3).reshape(-1,1)
+    X = np.hstack((x, interaction_effect))
+    
+    glm_clayton.fit(X,  y_clayton[:, 0]) 
+    glm_gumbel.fit(X, y_gumbel[:, 0])
+    glm_gaussian.fit(X, y_gauss[:, 0])
+    
+    glm_clayton_pred1 = 1/glm_clayton.predict(X)
+    glm_gumbel_pred1 = 1/glm_gumbel.predict(X)
+    glm_gaussian_pred1 = 1/glm_gaussian.predict(X)
+    
+    glm_clayton.fit(X, y_clayton[:, 1])
+    glm_gumbel.fit(X, y_gumbel[:, 1])
+    glm_gaussian.fit(X, y_gauss[:, 1])
+    
+    glm_clayton_pred2 = 1/glm_clayton.predict(X)
+    glm_gumbel_pred2 = 1/glm_gumbel.predict(X)
+    glm_gaussian_pred2 = 1/glm_gaussian.predict(X)
+    
+    glm_clayton_pred = np.hstack((glm_clayton_pred1.reshape(-1,1), glm_clayton_pred2.reshape(-1,1)))
+    glm_gumbel_pred = np.hstack((glm_gumbel_pred1.reshape(-1,1), glm_gumbel_pred2.reshape(-1,1)))
+    glm_gaussian_pred = np.hstack((glm_gaussian_pred1.reshape(-1,1), glm_gaussian_pred2.reshape(-1,1)))
+
     with suppress_stdout_stderr(): # suppress progress bar
-        marginal_clayton = MBT(loss_type = "joint_exponential", n_boosts = 250, min_leaf = 1000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_clayton, do_plot=False)
-        marginal_gumbel = MBT(loss_type = "joint_exponential", n_boosts = 250, min_leaf = 1000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_gumbel, do_plot=False)
-        marginal_gaussian = MBT(loss_type = "joint_exponential", n_boosts = 250, min_leaf = 1000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_gauss, do_plot=False)
+        marginal_clayton = MBT(loss_type = "joint_exponential", n_boosts = 500, min_leaf = 2000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_clayton, do_plot=False)
+        marginal_gumbel = MBT(loss_type = "joint_exponential", n_boosts = 500, min_leaf = 2000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_gumbel, do_plot=False)
+        marginal_gaussian = MBT(loss_type = "joint_exponential", n_boosts = 500, min_leaf = 2000, refit=False, learning_rate=0.1, lambda_weights=0.1).fit(x, y_gauss, do_plot=False)
 
     nat_rate_clayton = marginal_clayton.predict(x)
     nat_rate_gumbel = marginal_gumbel.predict(x)
@@ -248,15 +274,25 @@ for i in range(n_sim):
     rate_bar_gumbel = np.exp(jointexp.get_initial_guess(y_gumbel))
     rate_bar_gauss = np.exp(jointexp.get_initial_guess(y_gauss))
 
-    # Benchmark marginal MSE
-    benchmark_marginal_results["clayton_sample"]["mse"].append(mse(rate, rate_bar_clayton))
-    benchmark_marginal_results["gumbel_sample"]["mse"].append(mse(rate, rate_bar_gumbel))
-    benchmark_marginal_results["gaussian_sample"]["mse"].append(mse(rate, rate_bar_gauss))
+    # Benchmark MLE marginal MSE
+    benchmark_marginal_results["mle"]["clayton_sample"]["mse"].append(mse(rate, rate_bar_clayton))
+    benchmark_marginal_results["mle"]["gumbel_sample"]["mse"].append(mse(rate, rate_bar_gumbel))
+    benchmark_marginal_results["mle"]["gaussian_sample"]["mse"].append(mse(rate, rate_bar_gauss))
 
-    # Benchmark marginal -logL
-    benchmark_marginal_results["clayton_sample"]["-logL"].append(jointexp.tree_loss(y_clayton, np.log(rate_bar_clayton)))
-    benchmark_marginal_results["gumbel_sample"]["-logL"].append(jointexp.tree_loss(y_gumbel, np.log(rate_bar_gumbel)))
-    benchmark_marginal_results["gaussian_sample"]["-logL"].append(jointexp.tree_loss(y_gauss, np.log(rate_bar_gauss)))
+    # Benchmark GLM marginal MSE
+    benchmark_marginal_results["glm"]["clayton_sample"]["mse"].append(mse(rate, glm_clayton_pred))
+    benchmark_marginal_results["glm"]["gumbel_sample"]["mse"].append(mse(rate, glm_gumbel_pred))
+    benchmark_marginal_results["glm"]["gaussian_sample"]["mse"].append(mse(rate, glm_gaussian_pred))
+
+    # Benchmark MLE marginal -logL
+    benchmark_marginal_results["mle"]["clayton_sample"]["-logL"].append(jointexp.tree_loss(y_clayton, np.log(rate_bar_clayton)))
+    benchmark_marginal_results["mle"]["gumbel_sample"]["-logL"].append(jointexp.tree_loss(y_gumbel, np.log(rate_bar_gumbel)))
+    benchmark_marginal_results["mle"]["gaussian_sample"]["-logL"].append(jointexp.tree_loss(y_gauss, np.log(rate_bar_gauss)))
+
+    # Benchmark GLM marginal -logL
+    benchmark_marginal_results["glm"]["clayton_sample"]["-logL"].append(jointexp.tree_loss(y_clayton, np.log(glm_clayton_pred)))
+    benchmark_marginal_results["glm"]["gumbel_sample"]["-logL"].append(jointexp.tree_loss(y_gumbel, np.log(glm_gumbel_pred)))
+    benchmark_marginal_results["glm"]["gaussian_sample"]["-logL"].append(jointexp.tree_loss(y_gauss, np.log(glm_gaussian_pred)))
 
     # Model marginal MSE
     model_marginal_results["clayton"]["mse"].append(mse(rate, rate_clayton))
@@ -270,9 +306,9 @@ for i in range(n_sim):
 
     with suppress_stdout_stderr():
         # fit copula to true copula observations (U)
-        mcop_clayton = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "clayton", refit = False, min_leaf = 1000, verbose = 0, lambda_weights = 0.1).fit(x, clayton_sample, do_plot = False)
-        mcop_gumbel = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "gumbel", refit = False, min_leaf = 1000, verbose = 0, lambda_weights=0.1).fit(x, gumbel_sample, do_plot = False)
-        mcop_gaussian = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "gaussian", refit = False, min_leaf = 1000, verbose = 0, lambda_weights=0.1).fit(x, gaussian_sample, do_plot = False)
+        mcop_clayton = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "clayton", refit = False, min_leaf = 2000, verbose = 0, lambda_weights = 0.1).fit(x, clayton_sample, do_plot = False)
+        mcop_gumbel = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "gumbel", refit = False, min_leaf = 2000, verbose = 0, lambda_weights=0.1).fit(x, gumbel_sample, do_plot = False)
+        mcop_gaussian = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "gaussian", refit = False, min_leaf = 2000, verbose = 0, lambda_weights=0.1).fit(x, gaussian_sample, do_plot = False)
 
     reparam_theta_clayton = mcop_clayton.predict(x)
     reparam_theta_gumbel = mcop_gumbel.predict(x)
@@ -287,9 +323,9 @@ for i in range(n_sim):
     tau_bar_gaussian = special.expit(gaussian.get_initial_guess(gaussian_sample))
 
     # Benchmark copula MSE (U)
-    benchmark_copula_results["true"]["clayton"]["mse"].append(mse(tau, tau_bar_clayton))
-    benchmark_copula_results["true"]["gumbel"]["mse"].append(mse(tau, tau_bar_gumbel))
-    benchmark_copula_results["true"]["gaussian"]["mse"].append(mse(tau, tau_bar_gaussian))
+    benchmark_copula_results["true"]["clayton"]["mse"].append(mse(tau.reshape(-1, 1), tau_bar_clayton))
+    benchmark_copula_results["true"]["gumbel"]["mse"].append(mse(tau.reshape(-1, 1), tau_bar_gumbel))
+    benchmark_copula_results["true"]["gaussian"]["mse"].append(mse(tau.reshape(-1, 1), tau_bar_gaussian))
 
     # Benchmark copula -logL (U)
     benchmark_copula_results["true"]["clayton"]["-logL"].append(clayton.tree_loss(clayton_sample, special.logit(tau_bar_clayton)))
@@ -297,9 +333,9 @@ for i in range(n_sim):
     benchmark_copula_results["true"]["gaussian"]["-logL"].append(gaussian.tree_loss(gaussian_sample, special.logit(tau_bar_gaussian)))
 
     # Model copula MSE (U)
-    model_copula_results["true"]["clayton"]["mse"].append(mse(tau, tau_clayton))
-    model_copula_results["true"]["gumbel"]["mse"].append(mse(tau, tau_gumbel))
-    model_copula_results["true"]["gaussian"]["mse"].append(mse(tau, tau_gaussian))
+    model_copula_results["true"]["clayton"]["mse"].append(mse(tau.reshape(-1, 1), tau_clayton))
+    model_copula_results["true"]["gumbel"]["mse"].append(mse(tau.reshape(-1, 1), tau_gumbel))
+    model_copula_results["true"]["gaussian"]["mse"].append(mse(tau.reshape(-1, 1), tau_gaussian))
 
     # Model copula -logL (U)
     model_copula_results["true"]["clayton"]["-logL"].append(clayton.tree_loss(clayton_sample, special.logit(tau_clayton)))
@@ -321,9 +357,9 @@ for i in range(n_sim):
 
     with suppress_stdout_stderr():
          # fit copula to cdf-based pseudo copula observations (V)
-        cdf_cop_clayton = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "clayton", refit = False, min_leaf = 1000, lambda_weights=0.1).fit(x, cdf_obs_clayton, do_plot = False)
-        cdf_cop_gumbel = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "gumbel", refit = False, min_leaf = 1000, lambda_weights=0.1).fit(x, cdf_obs_gumbel, do_plot = False)
-        cdf_cop_gaussian = MBT(n_boosts = 250, learning_rate = 0.1, loss_type = "gaussian", refit = False, min_leaf = 1000, lambda_weights=0.1).fit(x, cdf_obs_gaussian, do_plot = False)
+        cdf_cop_clayton = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "clayton", refit = False, min_leaf = 2000, lambda_weights=0.1).fit(x, cdf_obs_clayton, do_plot = False)
+        cdf_cop_gumbel = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "gumbel", refit = False, min_leaf = 2000, lambda_weights=0.1).fit(x, cdf_obs_gumbel, do_plot = False)
+        cdf_cop_gaussian = MBT(n_boosts = 500, learning_rate = 0.1, loss_type = "gaussian", refit = False, min_leaf = 2000, lambda_weights=0.1).fit(x, cdf_obs_gaussian, do_plot = False)
     
     cdf_reparam_theta_clayton = cdf_cop_clayton.predict(x)
     cdf_reparam_theta_gumbel = cdf_cop_gumbel.predict(x)
@@ -338,9 +374,9 @@ for i in range(n_sim):
     cdf_tau_bar_gaussian = special.expit(gaussian.get_initial_guess(cdf_obs_gaussian))
 
     # Benchmark copula MSE (V)
-    benchmark_copula_results["pseudo"]["clayton"]["mse"].append(mse(tau, cdf_tau_bar_clayton))
-    benchmark_copula_results["pseudo"]["gumbel"]["mse"].append(mse(tau, cdf_tau_bar_gumbel))
-    benchmark_copula_results["pseudo"]["gaussian"]["mse"].append(mse(tau, cdf_tau_bar_gaussian))
+    benchmark_copula_results["pseudo"]["clayton"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_bar_clayton))
+    benchmark_copula_results["pseudo"]["gumbel"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_bar_gumbel))
+    benchmark_copula_results["pseudo"]["gaussian"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_bar_gaussian))
 
     # Benchmark copula -logL (V)
     benchmark_copula_results["pseudo"]["clayton"]["-logL"].append(clayton.tree_loss(clayton_sample, special.logit(cdf_tau_bar_clayton)))
@@ -348,9 +384,9 @@ for i in range(n_sim):
     benchmark_copula_results["pseudo"]["gaussian"]["-logL"].append(gaussian.tree_loss(gaussian_sample, special.logit(cdf_tau_bar_gaussian)))
 
     # Model copula MSE (V)
-    model_copula_results["pseudo"]["clayton"]["mse"].append(mse(tau, cdf_tau_clayton))
-    model_copula_results["pseudo"]["gumbel"]["mse"].append(mse(tau, cdf_tau_gumbel))
-    model_copula_results["pseudo"]["gaussian"]["mse"].append(mse(tau, cdf_tau_gaussian))
+    model_copula_results["pseudo"]["clayton"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_clayton))
+    model_copula_results["pseudo"]["gumbel"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_gumbel))
+    model_copula_results["pseudo"]["gaussian"]["mse"].append(mse(tau.reshape(-1, 1), cdf_tau_gaussian))
 
     # Model copula -logL (V)
     model_copula_results["pseudo"]["clayton"]["-logL"].append(clayton.tree_loss(clayton_sample, special.logit(cdf_tau_clayton)))
