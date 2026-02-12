@@ -6,5 +6,9 @@
 .ipynb_checkpoints/
 
 # Ignore virtual environments
-venv/
-tfenv-3.12/
+mbtr39env/
+xgblss310env/
+xgblss311env/
+
+#Ignore package
+mbtr/
