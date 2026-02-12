@@ -110,7 +110,7 @@ for i in range(n_sim):
     theta0_mbt = 1/np.exp(gamma0_mbt_pred[:,1]).reshape(-1,1)
 
     sigma0_mbt = np.sqrt(1/(2*np.exp(lognormal0_mbt_pred[:,1])).reshape(-1,1))
-    mu0_mbt = lognormal0_mbt_pred[:,0].reshape(-1,1)*sigma0_mbt
+    mu0_mbt = lognormal0_mbt_pred[:,0].reshape(-1,1)*(sigma0_mbt**2)
 
     # GLM predictions
     alpha0_glm = 1/gamma0_glm.scale # scalar
@@ -201,7 +201,7 @@ for i in range(n_sim):
     theta2_mbt = 1/np.exp(gamma2_mbt_pred[:,1]).reshape(-1,1)
 
     sigma2_mbt = np.sqrt(1/(2*np.exp(lognormal2_mbt_pred[:,1])).reshape(-1,1))
-    mu2_mbt = lognormal2_mbt_pred[:,0].reshape(-1,1)*sigma2_mbt
+    mu2_mbt = lognormal2_mbt_pred[:,0].reshape(-1,1)*(sigma2_mbt**2)
 
     # GLM predictions
     alpha2_glm = 1/gamma2_glm.scale # scalar
