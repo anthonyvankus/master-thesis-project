@@ -19,6 +19,8 @@ from Losses import GammaLoss
 from Losses.GammaLoss import GammaLikelihood
 from Losses import LognormalLoss
 from Losses.LognormalLoss import LognormalLikelihood
+import json
+from contextlib import contextmanager
 
 LOSS_MAP['gamma'] = GammaLikelihood
 LOSS_MAP['lognormal'] = LognormalLikelihood
@@ -107,19 +109,20 @@ for i in range(n_sim):
     alpha0_mbt = np.exp(gamma0_mbt_pred[:,0]).reshape(-1,1)
     theta0_mbt = 1/np.exp(gamma0_mbt_pred[:,1]).reshape(-1,1)
 
-    sigma0_mbt = 1/(2*np.exp(lognormal0_mbt_pred[:,1]).reshape(-1,1))
+    sigma0_mbt = np.sqrt(1/(2*np.exp(lognormal0_mbt_pred[:,1])).reshape(-1,1))
     mu0_mbt = lognormal0_mbt_pred[:,0].reshape(-1,1)*sigma0_mbt
 
     # GLM predictions
     alpha0_glm = 1/gamma0_glm.scale # scalar
     theta0_glm = (gamma0_glm.fittedvalues*gamma0_glm.scale).reshape(-1,1) # vector
 
-    mu0_glm = np.exp(lognormal0_glm.fittedvalues).reshape(-1,1) # vector
+    mu0_glm = lognormal0_glm.fittedvalues.reshape(-1,1) # vector
     sigma0_glm = np.sqrt(lognormal0_glm.scale) # scalar
 
     # fit MLE (intercept-only) model
     alpha0_mle, _, theta0_mle = scipy.stats.gamma.fit(gamma0, floc=0)
     sigma0_mle, _, mu0_mle = scipy.stats.lognorm.fit(lognormal0, floc = 0)
+    mu0_mle = np.log(mu0_mle)
 
     # performance measures
     # MLE
@@ -138,7 +141,7 @@ for i in range(n_sim):
     results_spec0["mle"]["lognormal"]["sigma"]["bias"].append(bias(sigma0, sigma0_mle))
 
     results_spec0["mle"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma0, a = alpha0_mle, scale = theta0_mle)))
-    results_spec0["mle"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = mu0_mle, s = sigma0_mle)))
+    results_spec0["mle"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = np.exp(mu0_mle), s = sigma0_mle)))
 
     #GLM
     results_spec0["glm"]["gamma"]["alpha"]["mse"].append(mse(alpha0, alpha0_glm))
@@ -156,7 +159,7 @@ for i in range(n_sim):
     results_spec0["glm"]["lognormal"]["sigma"]["bias"].append(bias(sigma0, sigma0_glm))
 
     results_spec0["glm"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma0, a = alpha0_glm*np.ones_like(theta0_glm), scale = theta0_glm)))
-    results_spec0["glm"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = mu0_glm, s = sigma0_glm*np.ones_like(mu0_glm))))
+    results_spec0["glm"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = np.exp(mu0_glm), s = sigma0_glm*np.ones_like(mu0_glm))))
 
     #MBT
     results_spec0["mbt"]["gamma"]["alpha"]["mse"].append(mse(alpha0, alpha0_mbt))
@@ -174,7 +177,7 @@ for i in range(n_sim):
     results_spec0["mbt"]["lognormal"]["sigma"]["bias"].append(bias(sigma0, sigma0_mbt))
 
     results_spec0["mbt"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma0, a = alpha0_mbt, scale = theta0_mbt)))
-    results_spec0["mbt"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = mu0_mbt, s = sigma0_mbt)))
+    results_spec0["mbt"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal0, scale = np.exp(mu0_mbt), s = sigma0_mbt)))
 
     # simulate from scenario 2
     gamma2 = scipy.stats.gamma.rvs(a = alpha2, scale = theta2, loc = 0, size=(1,n)).reshape(-1,1)
@@ -197,19 +200,20 @@ for i in range(n_sim):
     alpha2_mbt = np.exp(gamma2_mbt_pred[:,0]).reshape(-1,1)
     theta2_mbt = 1/np.exp(gamma2_mbt_pred[:,1]).reshape(-1,1)
 
-    sigma2_mbt = 1/(2*np.exp(lognormal2_mbt_pred[:,1]).reshape(-1,1))
+    sigma2_mbt = np.sqrt(1/(2*np.exp(lognormal2_mbt_pred[:,1])).reshape(-1,1))
     mu2_mbt = lognormal2_mbt_pred[:,0].reshape(-1,1)*sigma2_mbt
 
     # GLM predictions
     alpha2_glm = 1/gamma2_glm.scale # scalar
     theta2_glm = (gamma2_glm.fittedvalues*gamma2_glm.scale).reshape(-1,1) # vector
 
-    mu2_glm = np.exp(lognormal2_glm.fittedvalues).reshape(-1,1) # vector
+    mu2_glm = lognormal2_glm.fittedvalues.reshape(-1,1) # vector
     sigma2_glm = np.sqrt(lognormal2_glm.scale) # scalar
 
     # fit MLE (intercept-only) model
     alpha2_mle, _, theta2_mle = scipy.stats.gamma.fit(gamma2, floc=0)
     sigma2_mle, _, mu2_mle = scipy.stats.lognorm.fit(lognormal2, floc = 0)
+    mu2_mle = np.log(mu2_mle)
 
     # performance measures
     # MLE
@@ -228,7 +232,7 @@ for i in range(n_sim):
     results_spec2["mle"]["lognormal"]["sigma"]["bias"].append(bias(sigma2, sigma2_mle))
 
     results_spec2["mle"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma2, a = alpha2_mle, scale = theta2_mle)))
-    results_spec2["mle"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = mu2_mle, s = sigma2_mle)))
+    results_spec2["mle"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = np.exp(mu2_mle), s = sigma2_mle)))
 
     #GLM
     results_spec2["glm"]["gamma"]["alpha"]["mse"].append(mse(alpha2, alpha2_glm))
@@ -246,7 +250,7 @@ for i in range(n_sim):
     results_spec2["glm"]["lognormal"]["sigma"]["bias"].append(bias(sigma2, sigma2_glm))
 
     results_spec2["glm"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma2, a = alpha2_glm*np.ones_like(theta2_glm), scale = theta2_glm)))
-    results_spec2["glm"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = mu2_glm, s = sigma2_glm*np.ones_like(mu2_glm))))
+    results_spec2["glm"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = np.exp(mu2_glm), s = sigma2_glm*np.ones_like(mu2_glm))))
 
     #MBT
     results_spec2["mbt"]["gamma"]["alpha"]["mse"].append(mse(alpha2, alpha2_mbt))
@@ -264,7 +268,7 @@ for i in range(n_sim):
     results_spec2["mbt"]["lognormal"]["sigma"]["bias"].append(bias(sigma2, sigma2_mbt))
 
     results_spec2["mbt"]["gamma"]["nll"].append(-np.sum(scipy.stats.gamma.logpdf(x = gamma2, a = alpha2_mbt, scale = theta2_mbt)))
-    results_spec2["mbt"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = mu2_mbt, s = sigma2_mbt)))
+    results_spec2["mbt"]["lognormal"]["nll"].append(-np.sum(scipy.stats.lognorm.logpdf(x = lognormal2, scale = np.exp(mu2_mbt), s = sigma2_mbt)))
 
 # write to json file
 with open('marginal_results_spec0.json', 'w', encoding='utf-8') as f:
