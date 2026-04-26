@@ -7,6 +7,7 @@ from xgboost import XGBRegressor
 import sys
 import os
 import json
+from contextlib import contextmanager
 
 # Set project root relative to notebook location
 project_root = os.path.abspath(os.path.join(os.getcwd(), '..'))
@@ -59,6 +60,16 @@ def partial_dependence_with_truth(
             truth[i] = theta_true.mean()
     
     return grid, pdp.tolist(), truth
+
+@contextmanager
+def suppress_stdout_stderr():
+    with open(os.devnull, 'w') as fnull:
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = fnull, fnull
+        try:
+            yield
+        finally:
+            sys.stdout, sys.stderr = old_stdout, old_stderr
 
 gauss_model = XGBRegressor(
     objective=gauss.gaussian_copula_nll_obj,
@@ -228,7 +239,8 @@ for i in range(n_sim):
 
     # Fitting gaussian copula to linear scenario
     #gauss_model.set_params(reg_lambda=0.2, max_depth=2, base_score=gauss.get_initial_guess(y_train_gauss1))
-    gauss1_xgb = gauss_model.fit(x_train_gauss1, y_train_gauss1, eval_set=[(x_val_gauss1, y_val_gauss1)])
+    with suppress_stdout_stderr(): # suppress progress bar
+        gauss1_xgb = gauss_model.fit(x_train_gauss1, y_train_gauss1, eval_set=[(x_val_gauss1, y_val_gauss1)])
 
     test_preds_gauss1 = gauss1_xgb.predict(x_test_gauss1)[:,0].reshape(-1,1)
 
@@ -273,7 +285,8 @@ for i in range(n_sim):
 
     # Fitting gaussian copula to non-linear scenario
     #gauss_model.set_params(reg_lambda=0.2, max_depth=2, base_score=gauss.get_initial_guess(y_train_gauss2))
-    gauss2_xgb = gauss_model.fit(x_train_gauss2, y_train_gauss2, eval_set=[(x_val_gauss2, y_val_gauss2)])
+    with suppress_stdout_stderr(): # suppress progress bar
+        gauss2_xgb = gauss_model.fit(x_train_gauss2, y_train_gauss2, eval_set=[(x_val_gauss2, y_val_gauss2)])
 
     test_preds_gauss2 = gauss2_xgb.predict(x_test_gauss2)[:,0].reshape(-1,1)
 
@@ -334,7 +347,8 @@ for i in range(n_sim):
 
     # Fitting clayton copula to linear scenario
     try:
-        clayton1_xgb = clayton_model.fit(x_train_clayton1, y_train_clayton1, eval_set=[(x_val_clayton1, y_val_clayton1)])
+        with suppress_stdout_stderr(): # suppress progress bar
+            clayton1_xgb = clayton_model.fit(x_train_clayton1, y_train_clayton1, eval_set=[(x_val_clayton1, y_val_clayton1)])
 
         test_preds_clayton1 = clayton1_xgb.predict(x_test_clayton1)[:,0].reshape(-1,1)
 
@@ -384,7 +398,8 @@ for i in range(n_sim):
 
     # Fitting clayton copula to non-linear scenario
     try:
-        clayton2_xgb = clayton_model.fit(x_train_clayton2, y_train_clayton2, eval_set=[(x_val_clayton2, y_val_clayton2)])
+        with suppress_stdout_stderr(): # suppress progress bar
+            clayton2_xgb = clayton_model.fit(x_train_clayton2, y_train_clayton2, eval_set=[(x_val_clayton2, y_val_clayton2)])
 
         test_preds_clayton2 = clayton2_xgb.predict(x_test_clayton2)[:,0].reshape(-1,1)
 
@@ -445,7 +460,8 @@ for i in range(n_sim):
 
     # Fitting gumbel copula to linear scenario
     try:
-        gumbel1_xgb = gumbel_model.fit(x_train_gumbel1, y_train_gumbel1, eval_set=[(x_val_gumbel1, y_val_gumbel1)])
+        with suppress_stdout_stderr(): # suppress progress bar
+            gumbel1_xgb = gumbel_model.fit(x_train_gumbel1, y_train_gumbel1, eval_set=[(x_val_gumbel1, y_val_gumbel1)])
 
         test_preds_gumbel1 = gumbel1_xgb.predict(x_test_gumbel1)[:,0].reshape(-1,1)
 
@@ -492,7 +508,8 @@ for i in range(n_sim):
 
     # Fitting gumbel copula to non-linear scenario
     try:
-        gumbel2_xgb = gumbel_model.fit(x_train_gumbel2, y_train_gumbel2, eval_set=[(x_val_gumbel2, y_val_gumbel2)])
+        with suppress_stdout_stderr(): # suppress progress bar
+            gumbel2_xgb = gumbel_model.fit(x_train_gumbel2, y_train_gumbel2, eval_set=[(x_val_gumbel2, y_val_gumbel2)])
 
         test_preds_gumbel2 = gumbel2_xgb.predict(x_test_gumbel2)[:,0].reshape(-1,1)
 
