@@ -149,4 +149,4 @@ def gumbel_copula_nll_metric(u: np.ndarray, predt: np.ndarray) -> Tuple[str, flo
     return float(-log_likelihood)
 
 def gumbel_predt2tau(predt):
-    return gumbel_par2tau(special.expit(predt))
+    return special.expit(predt)

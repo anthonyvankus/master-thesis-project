@@ -169,4 +169,4 @@ def clayton_copula_nll_metric(u: np.ndarray, predt: np.ndarray) -> Tuple[str, fl
     return float(-log_likelihood)
 
 def clayton_predt2tau(predt):
-    return clayton_par2tau(special.expit(predt))
+    return special.expit(predt)
