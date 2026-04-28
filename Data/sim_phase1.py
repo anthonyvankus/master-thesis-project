@@ -1,8 +1,5 @@
 import numpy as np
 import scipy.special as special
-import openturns as ot
-from matplotlib import pyplot as plt
-from typing import Dict, List, Tuple
 from xgboost import XGBRegressor
 import sys
 import os
@@ -23,7 +20,7 @@ from sklearn.model_selection import train_test_split
 def mse(y, y_pred):
     return np.sum((y-y_pred)**2)
 
-def partial_dependence_with_truth(
+def partial_dependence_plot(
     model,
     X,
     feature_index,
@@ -52,14 +49,7 @@ def partial_dependence_with_truth(
             preds = transform(preds)
         pdp[i] = preds.mean()
         
-        # True PDP
-        if true_theta_fn:
-            theta_true = true_theta_fn(X_temp)
-            #if transform:
-                #theta_true = transform(theta_true)
-            truth[i] = theta_true.mean()
-    
-    return grid, pdp.tolist(), truth
+    return pdp.tolist()
 
 @contextmanager
 def suppress_stdout_stderr():
@@ -244,7 +234,7 @@ for i in range(n_sim):
 
     test_preds_gauss1 = gauss1_xgb.predict(x_test_gauss1)[:,0].reshape(-1,1)
 
-    _, pdp_gauss1_x1, truth_linear_x1 = partial_dependence_with_truth(
+    pdp_gauss1_x1 = partial_dependence_plot(
         gauss1_xgb,
         x_pdp,
         feature_index=0,
@@ -253,7 +243,7 @@ for i in range(n_sim):
         grid = np.linspace(0,1,grid_resolution)
     )
 
-    _, pdp_gauss1_x2, truth_linear_x2 = partial_dependence_with_truth(
+    pdp_gauss1_x2 = partial_dependence_plot(
         gauss1_xgb,
         x_pdp,
         feature_index=1,
@@ -262,7 +252,7 @@ for i in range(n_sim):
         grid = np.linspace(0,1,grid_resolution)
     )
 
-    _, pdp_gauss1_x3, truth_linear_x3 = partial_dependence_with_truth(
+    pdp_gauss1_x3 = partial_dependence_plot(
         gauss1_xgb,
         x_pdp,
         feature_index=2,
@@ -290,7 +280,7 @@ for i in range(n_sim):
 
     test_preds_gauss2 = gauss2_xgb.predict(x_test_gauss2)[:,0].reshape(-1,1)
 
-    _, pdp_gauss2_x1, truth_nonlinear_x1 = partial_dependence_with_truth(
+    pdp_gauss2_x1 = partial_dependence_plot(
         gauss2_xgb,
         x_pdp,
         feature_index=0,
@@ -299,7 +289,7 @@ for i in range(n_sim):
         grid = np.linspace(0,1,grid_resolution)
     )
 
-    _, pdp_gauss2_x2, truth_nonlinear_x2 = partial_dependence_with_truth(
+    pdp_gauss2_x2 = partial_dependence_plot(
         gauss2_xgb,
         x_pdp,
         feature_index=1,
@@ -308,7 +298,7 @@ for i in range(n_sim):
         grid = np.linspace(0,1,grid_resolution)
     )
 
-    _, pdp_gauss2_x3, truth_nonlinear_x3 = partial_dependence_with_truth(
+    pdp_gauss2_x3 = partial_dependence_plot(
         gauss2_xgb,
         x_pdp,
         feature_index=2,
@@ -327,8 +317,6 @@ for i in range(n_sim):
     results["non-linear"]["gaussian"]["nll_constant"].append(gauss.gaussian_copula_nll_metric(y_test_gauss2, gauss.get_initial_guess(y_test_gauss2)))
     results["non-linear"]["gaussian"]["mse_xgb"].append(mse(true_tau2(x_test_gauss2).reshape(-1,1), gauss.gauss_predt2tau(test_preds_gauss2)))
     results["non-linear"]["gaussian"]["mse_constant"].append(mse(true_tau2(x_test_gauss2), gauss.gauss_predt2tau(gauss.get_initial_guess(y_test_gauss2))))
-
-
 
 
     #Clayton copula
@@ -352,7 +340,7 @@ for i in range(n_sim):
 
         test_preds_clayton1 = clayton1_xgb.predict(x_test_clayton1)[:,0].reshape(-1,1)
 
-        _, pdp_clayton1_x1, truth_linear_x1 = partial_dependence_with_truth(
+        pdp_clayton1_x1 = partial_dependence_plot(
             clayton1_xgb,
             x_pdp,
             feature_index=0,
@@ -361,7 +349,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_clayton1_x2, truth_linear_x2 = partial_dependence_with_truth(
+        pdp_clayton1_x2 = partial_dependence_plot(
             clayton1_xgb,
             x_pdp,
             feature_index=1,
@@ -370,7 +358,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_clayton1_x3, truth_linear_x3 = partial_dependence_with_truth(
+        pdp_clayton1_x3 = partial_dependence_plot(
             clayton1_xgb,
             x_pdp,
             feature_index=2,
@@ -403,7 +391,7 @@ for i in range(n_sim):
 
         test_preds_clayton2 = clayton2_xgb.predict(x_test_clayton2)[:,0].reshape(-1,1)
 
-        _, pdp_clayton2_x1, truth_nonlinear_x1 = partial_dependence_with_truth(
+        pdp_clayton2_x1 = partial_dependence_plot(
             clayton2_xgb,
             x_pdp,
             feature_index=0,
@@ -412,7 +400,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_clayton2_x2, truth_nonlinear_x2 = partial_dependence_with_truth(
+        pdp_clayton2_x2 = partial_dependence_plot(
             clayton2_xgb,
             x_pdp,
             feature_index=1,
@@ -421,7 +409,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_clayton2_x3, truth_nonlinear_x3 = partial_dependence_with_truth(
+        pdp_clayton2_x3 = partial_dependence_plot(
             clayton2_xgb,
             x_pdp,
             feature_index=2,
@@ -443,9 +431,7 @@ for i in range(n_sim):
     except:
         pass
 
-
     # Gumbel copula
-
     y_gumbel1 = gumbel.sample_gumbel_copula(gumbel.gumbel_tau2par(tau1), seed=seed)
 
     #train, validation and test data split (70,10,20)
@@ -465,7 +451,7 @@ for i in range(n_sim):
 
         test_preds_gumbel1 = gumbel1_xgb.predict(x_test_gumbel1)[:,0].reshape(-1,1)
 
-        _, pdp_gumbel1_x1, truth_linear_x1 = partial_dependence_with_truth(
+        pdp_gumbel1_x1 = partial_dependence_plot(
             gumbel1_xgb,
             x_pdp,
             feature_index=0,
@@ -474,7 +460,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_gumbel1_x2, truth_linear_x2 = partial_dependence_with_truth(
+        pdp_gumbel1_x2 = partial_dependence_plot(
             gumbel1_xgb,
             x_pdp,
             feature_index=1,
@@ -483,7 +469,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_gumbel1_x3, truth_linear_x3 = partial_dependence_with_truth(
+        pdp_gumbel1_x3 = partial_dependence_plot(
             gumbel1_xgb,
             x_pdp,
             feature_index=2,
@@ -513,7 +499,7 @@ for i in range(n_sim):
 
         test_preds_gumbel2 = gumbel2_xgb.predict(x_test_gumbel2)[:,0].reshape(-1,1)
 
-        _, pdp_gumbel2_x1, truth_nonlinear_x1 = partial_dependence_with_truth(
+        pdp_gumbel2_x1 = partial_dependence_plot(
             gumbel2_xgb,
             x_pdp,
             feature_index=0,
@@ -522,7 +508,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_gumbel2_x2, truth_nonlinear_x2 = partial_dependence_with_truth(
+        pdp_gumbel2_x2 = partial_dependence_plot(
             gumbel2_xgb,
             x_pdp,
             feature_index=1,
@@ -531,7 +517,7 @@ for i in range(n_sim):
             grid = np.linspace(0,1,grid_resolution)
         )
 
-        _, pdp_gumbel2_x3, truth_nonlinear_x3 = partial_dependence_with_truth(
+        pdp_gumbel2_x3 = partial_dependence_plot(
             gumbel2_xgb,
             x_pdp,
             feature_index=2,
