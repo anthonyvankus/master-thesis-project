@@ -456,55 +456,59 @@ for i in range(n_sim):
     pseudo_obs_test_gauss = clip_copula_samples(np.column_stack((lognorm.cdf(y_test_gauss[:, 0], s = 1.5, scale=np.exp(mu1_test_hat)), gamma.cdf(y_test_gauss[:, 1], a=1.5, scale=mu2_test_hat/1.5))), eps=1e-8)
 
     # Fitting XGBoost copula model to pseudo-observations
-    gauss_xgb = gauss_model.fit(x_train_gauss, pseudo_obs_train_gauss, eval_set=[(x_val_gauss, pseudo_obs_val_gauss)])
+    try:
+        with suppress_stdout_stderr(): # suppress progress bar
+            gauss_xgb = gauss_model.fit(x_train_gauss, pseudo_obs_train_gauss, eval_set=[(x_val_gauss, pseudo_obs_val_gauss)])
 
-    test_preds_gauss = gauss_xgb.predict(x_test_gauss)[:,0].reshape(-1,1)
+        test_preds_gauss = gauss_xgb.predict(x_test_gauss)[:,0].reshape(-1,1)
 
-    _, pdp_gauss_x1, _ = partial_dependence_with_truth(
-        gauss_xgb,
-        x_pdp,
-        feature_index=0,
-        true_theta_fn=true_tau,
-        transform=gauss.gauss_predt2tau,
-        grid = np.linspace(-1,1,grid_resolution)
-    )
+        _, pdp_gauss_x1, _ = partial_dependence_with_truth(
+            gauss_xgb,
+            x_pdp,
+            feature_index=0,
+            true_theta_fn=true_tau,
+            transform=gauss.gauss_predt2tau,
+            grid = np.linspace(-1,1,grid_resolution)
+        )
 
-    _, pdp_gauss_x2, _ = partial_dependence_with_truth(
-        gauss_xgb,
-        x_pdp,
-        feature_index=1,
-        true_theta_fn=true_tau,
-        transform=gauss.gauss_predt2tau,
-        grid = np.linspace(-1,1,grid_resolution)
-    )
+        _, pdp_gauss_x2, _ = partial_dependence_with_truth(
+            gauss_xgb,
+            x_pdp,
+            feature_index=1,
+            true_theta_fn=true_tau,
+            transform=gauss.gauss_predt2tau,
+            grid = np.linspace(-1,1,grid_resolution)
+        )
 
-    _, pdp_gauss_x3, _ = partial_dependence_with_truth(
-        gauss_xgb,
-        x_pdp,
-        feature_index=2,
-        true_theta_fn=true_tau,
-        transform=gauss.gauss_predt2tau,
-        grid = np.linspace(-1,1,grid_resolution)
-    )
+        _, pdp_gauss_x3, _ = partial_dependence_with_truth(
+            gauss_xgb,
+            x_pdp,
+            feature_index=2,
+            true_theta_fn=true_tau,
+            transform=gauss.gauss_predt2tau,
+            grid = np.linspace(-1,1,grid_resolution)
+        )
 
-    _, pdp_gauss_x4, _ = partial_dependence_with_truth(
-        gauss_xgb,
-        x_pdp,
-        feature_index=3,
-        true_theta_fn=true_tau,
-        transform=gauss.gauss_predt2tau,
-        grid = np.linspace(-1,1,grid_resolution)
-    )
+        _, pdp_gauss_x4, _ = partial_dependence_with_truth(
+            gauss_xgb,
+            x_pdp,
+            feature_index=3,
+            true_theta_fn=true_tau,
+            transform=gauss.gauss_predt2tau,
+            grid = np.linspace(-1,1,grid_resolution)
+        )
 
-    results["gaussian"]["pdp"]["x1"][i] = pdp_gauss_x1
-    results["gaussian"]["pdp"]["x2"][i] = pdp_gauss_x2
-    results["gaussian"]["pdp"]["x3"][i] = pdp_gauss_x3
-    results["gaussian"]["pdp"]["x4"][i] = pdp_gauss_x4
-    results["gaussian"]["feature_importance"][i] = gauss_xgb.feature_importances_.tolist()
-    results["gaussian"]["nll_xgb"].append(gauss.gaussian_copula_nll_metric(pseudo_obs_test_gauss, test_preds_gauss))
-    results["gaussian"]["nll_constant"].append(gauss.gaussian_copula_nll_metric(pseudo_obs_test_gauss, gauss.get_initial_guess(pseudo_obs_test_gauss)))
-    results["gaussian"]["mse_xgb"].append(mse(true_tau(x_test_gauss).reshape(-1,1), gauss.gauss_predt2tau(test_preds_gauss)))
-    results["gaussian"]["mse_constant"].append(mse(true_tau(x_test_gauss), gauss.gauss_predt2tau(gauss.get_initial_guess(pseudo_obs_test_gauss))))
+        results["gaussian"]["pdp"]["x1"][i] = pdp_gauss_x1
+        results["gaussian"]["pdp"]["x2"][i] = pdp_gauss_x2
+        results["gaussian"]["pdp"]["x3"][i] = pdp_gauss_x3
+        results["gaussian"]["pdp"]["x4"][i] = pdp_gauss_x4
+        results["gaussian"]["feature_importance"][i] = gauss_xgb.feature_importances_.tolist()
+        results["gaussian"]["nll_xgb"].append(gauss.gaussian_copula_nll_metric(pseudo_obs_test_gauss, test_preds_gauss))
+        results["gaussian"]["nll_constant"].append(gauss.gaussian_copula_nll_metric(pseudo_obs_test_gauss, gauss.get_initial_guess(pseudo_obs_test_gauss)))
+        results["gaussian"]["mse_xgb"].append(mse(true_tau(x_test_gauss).reshape(-1,1), gauss.gauss_predt2tau(test_preds_gauss)))
+        results["gaussian"]["mse_constant"].append(mse(true_tau(x_test_gauss), gauss.gauss_predt2tau(gauss.get_initial_guess(pseudo_obs_test_gauss))))
+    except:
+        pass
 
 
     # Clayton copula
