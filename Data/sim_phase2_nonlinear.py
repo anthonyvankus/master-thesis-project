@@ -145,7 +145,7 @@ gauss_model = XGBRegressor(
     eval_metric=gauss.gaussian_copula_nll_metric,
     early_stopping_rounds=3,
     learning_rate=0.01,
-    reg_lambda=0.0,
+    reg_lambda=0.2,
     max_depth=2,
     subsample=1.0,
     colsample_bytree=1.0,
@@ -158,7 +158,7 @@ clayton_model = XGBRegressor(
     tree_method="hist",
     eval_metric=clayton.clayton_copula_nll_metric,
     early_stopping_rounds=3,
-    learning_rate=0.1,
+    learning_rate=0.01,
     reg_lambda=0.2,
     max_depth=1,
     subsample=1.0,
@@ -341,8 +341,8 @@ for i in range(n_sim):
     x_train_gauss, x_val_gauss, y_train_gauss, y_val_gauss = train_test_split(x_main_gauss, y_main_gauss, test_size=0.125, random_state=42)
 
     # Fitting marginal distributions
-    normal_model1.set_params(learning_rate = 0.1, max_depth = 1, reg_lambda = 0.1)
-    gamma_model2.set_params(learning_rate = 0.1, max_depth = 1, reg_lambda = 0.1)
+    normal_model1.set_params(learning_rate = 0.1, max_depth = 1, reg_lambda = 0.0)
+    gamma_model2.set_params(learning_rate = 0.01, max_depth = 2, reg_lambda = 0.2)
 
     with suppress_stdout_stderr(): # suppress progress bar
         normal_xgb1 = normal_model1.fit(x_train_gauss, np.log(y_train_gauss[:,0]), eval_set=[(x_val_gauss, np.log(y_val_gauss[:,0]))])
@@ -524,7 +524,7 @@ for i in range(n_sim):
 
     # Fitting marginal distributions
     normal_model1.set_params(learning_rate = 0.01, max_depth = 1, reg_lambda = 0.0)
-    gamma_model2.set_params(learning_rate = 0.01, max_depth = 1, reg_lambda = 0.0)
+    gamma_model2.set_params(learning_rate = 0.01, max_depth = 2, reg_lambda = 0.0)
     with suppress_stdout_stderr(): # suppress progress bar
         normal_xgb1 = normal_model1.fit(x_train_clayton, np.log(y_train_clayton[:,0]), eval_set=[(x_val_clayton, np.log(y_val_clayton[:,0]))])
         gamma_xgb2 = gamma_model2.fit(x_train_clayton, y_train_clayton[:,1], eval_set=[(x_val_clayton, y_val_clayton[:,1])])
@@ -705,7 +705,7 @@ for i in range(n_sim):
 
     # Fitting marginal distributions
     normal_model1.set_params(learning_rate = 0.01, max_depth = 2, reg_lambda = 0.0)
-    gamma_model2.set_params(learning_rate = 0.01, max_depth = 3, reg_lambda = 0.0)
+    gamma_model2.set_params(learning_rate = 0.01, max_depth = 2, reg_lambda = 0.0)
 
     with suppress_stdout_stderr(): # suppress progress bar
         normal_xgb1 = normal_model1.fit(x_train_gumbel, np.log(y_train_gumbel[:,0]), eval_set=[(x_val_gumbel, np.log(y_val_gumbel[:,0]))])
