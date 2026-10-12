@@ -1,6 +1,4 @@
 import numpy as np
-import xgboost as xgb
-import scipy.stats as stats
 import scipy.special as special
 import openturns as ot
 from skfolio.distribution import ClaytonCopula
@@ -26,16 +24,10 @@ def get_initial_guess(y):
 
     :return: np.ndarray with (transformed) parameter initial guess
     """
-    #u0 = y[:, 0].reshape(-1,1)
-    #u1 = y[:, 1].reshape(-1,1)
-    #tau, _ = stats.kendalltau(u0, u1)
-
     clayton_copula = ClaytonCopula(itau=False)
     clayton_copula.fit(y)
     
     return special.logit(clayton_par2tau(clayton_copula.theta_))
-    
-    #return special.logit(tau)
 
 def sample_clayton_copula(theta_array, seed):
     """
@@ -72,8 +64,6 @@ def clayton_logAfunc(u, theta):
     u1 = u[:, 1].reshape(-1,1)
     a = np.hstack((-theta*np.log(u), np.zeros_like(u0)))
     b = np.hstack((np.ones_like(u0), np.ones_like(u1), -np.ones_like(u0)))
-    #print(a.shape)
-    #print(b.shape)
 
     return special.logsumexp(a, b=b, axis=1).reshape(-1,1)
     
@@ -97,10 +87,7 @@ def clayton_lpdf(u, theta):
     """
     u0 = u[:, 0].reshape(-1,1)
     u1 = u[:, 1].reshape(-1,1)
-    A_func = clayton_Afunc(u, theta)
-    #print(np.log(A_func))
-    #print(clayton_logAfunc(u, theta))
-    lpdf = special.log1p(theta) - (1+theta)*(np.log(u0)+ np.log(u1)) - (2+1/theta)*clayton_logAfunc(u, theta) #np.log(A_func)
+    lpdf = special.log1p(theta) - (1+theta)*(np.log(u0)+ np.log(u1)) - (2+1/theta)*clayton_logAfunc(u, theta)
     return np.sum(lpdf)
 
 def clayton_lpdf_grad(u, theta):
@@ -114,9 +101,6 @@ def clayton_lpdf_grad(u, theta):
     """
     u0 = u[:, 0].reshape(-1,1)
     u1 = u[:, 1].reshape(-1,1)
-
-    #A_func = clayton_Afunc(u, theta)
-    #logA = clayton_logAfunc(u, theta)
     dlogA = clayton_logA_grad(u, theta)
     lpdf_grad = 1/(1+theta) - (np.log(u0) + np.log(u1)) - (2 + 1/theta)*dlogA + clayton_logAfunc(u, theta)/np.square(theta)
     return lpdf_grad
@@ -147,11 +131,9 @@ def clayton_inv_link_grad(tpar):
 
 def clayton_gradient(u: np.ndarray, predt: np.ndarray) -> np.ndarray:
     '''Compute the gradient of the nll'''
-    #u = dtrain.get_label()
     tau = special.expit(predt)
-    #rho = gauss_tau2par(tau)
     theta = clayton_tau2par(tau)
-    return -clayton_lpdf_grad(u, theta)*(2*tau/(1-tau)) # explain # *clayton_inv_link_grad(predt)
+    return -clayton_lpdf_grad(u, theta)*(2*tau/(1-tau))
         
 def clayton_copula_nll_obj(u: np.ndarray, predt: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     '''Clayton copula negative log-likelihood objective'''
@@ -161,10 +143,8 @@ def clayton_copula_nll_obj(u: np.ndarray, predt: np.ndarray) -> Tuple[np.ndarray
 
 def clayton_copula_nll_metric(u: np.ndarray, predt: np.ndarray) -> Tuple[str, float]:
     ''' Clayton copula negative log-likelihood metric'''
-    #u = dtrain.get_label()
     tau = special.expit(predt)
-    #rho = gauss_tau2par(tau)
-    theta = clayton_tau2par(tau) #clayton_inv_link(predt)
+    theta = clayton_tau2par(tau)
     log_likelihood = clayton_lpdf(u, theta)
     return float(-log_likelihood)
 

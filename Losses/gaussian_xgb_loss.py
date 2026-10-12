@@ -1,5 +1,4 @@
 import numpy as np
-import xgboost as xgb
 import scipy.stats as stats
 from typing import Tuple
 from skfolio.distribution import GaussianCopula
@@ -33,10 +32,6 @@ def get_initial_guess(y):
 
     :return: np.ndarray with (transformed) parameter initial guess
     """
-    #u0 = y[:, 0].reshape(-1,1)
-    #u1 = y[:, 1].reshape(-1,1)
-    #tau, _ = stats.kendalltau(u0, u1)
-
     gaussian_copula = GaussianCopula(itau=False)
     gaussian_copula.fit(y)
     
@@ -143,9 +138,6 @@ def gaussian_inv_link_grad(tpar):
 
 def gaussian_gradient(u: np.ndarray, predt: np.ndarray) -> np.ndarray:
     '''Compute the gradient of the nll'''
-    #u = dtrain.get_label()
-    #tau = gauss_par2tau(gaussian_inv_link(predt))
-    #rho = gauss_tau2par(tau)
     rho = gaussian_inv_link(predt)
     return -gaussian_lpdf_grad(u, rho)*gaussian_inv_link_grad(predt)
         
@@ -157,9 +149,6 @@ def gaussian_copula_nll_obj(u: np.ndarray, predt: np.ndarray) -> Tuple[np.ndarra
 
 def gaussian_copula_nll_metric(u: np.ndarray, predt: np.ndarray) -> Tuple[str, float]:
     ''' Gaussian copula negative log-likelihood metric'''
-    #u = dtrain.get_label()
-    #tau = gauss_par2tau(gaussian_inv_link(predt))
-    #rho = gauss_tau2par(tau)
     rho = gaussian_inv_link(predt)
     log_likelihood = gaussian_lpdf(u, rho)
     return float(-log_likelihood)
